@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Zinda — draw it, it lives</title>
+  <meta name="description" content="Draw anything. AI recognises it and it comes alive on a 3D island." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://unpkg.com/ml5@1.2.1/dist/ml5.min.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+        "@dgreenheck/ez-tree": "https://cdn.jsdelivr.net/npm/@dgreenheck/ez-tree@1.1.0/build/ez-tree.es.js",
+        "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <div id="loader">
+    <div class="loader-mark">ZINDA</div>
+    <div class="loader-sub">growing an island…</div>
+  </div>
+
+  <header class="brand">
+    <h1>ZINDA</h1>
+    <p>draw it <span>·</span> it lives</p>
+  </header>
+
+  <div class="stats glass">
+    <span class="pulse"></span><b id="count">0</b>&nbsp;alive
+  </div>
+
+  <div id="toasts"></div>
+
+  <div id="follow" class="glass" hidden>
+    <span>Following</span> <b></b>
+    <button id="follow-love" type="button" title="Show some love">♥</button>
+    <button id="follow-release" type="button" title="Set it free">Release</button>
+    <button id="follow-close" type="button" title="Stop following">✕</button>
+  </div>
+
+  <div id="hint">Draw anything — AI brings it to life ✨</div>
+
+  <nav class="dock glass">
+    <button id="btn-draw" class="primary" type="button"><span class="ico">✏️</span><span>Draw<span class="lbl"> a creature</span></span></button>
+    <button id="btn-build" class="ghost" type="button" title="Build roads, trees, vehicles… (B)"><span class="ico">🏗️</span><span class="lbl">Build</span></button>
+    <button id="btn-hand" class="ghost" type="button" title="Draw in the air with your hand"><span class="ico">✋</span><span class="lbl">Air draw</span></button>
+    <button id="btn-space" class="ghost" type="button" title="Fly up to the solar system (S)"><span class="ico">🪐</span><span class="lbl">Space</span></button>
+    <button id="btn-drive" class="ghost" type="button" title="Drive a car (C)"><span class="ico">🚗</span><span class="lbl">Drive</span></button>
+    <button id="btn-rain" class="ghost round" type="button" title="Toggle rain (R)">🌧️</button>
+    <button id="btn-time" class="ghost round" type="button" title="Skip ahead in time">🌙</button>
+    <button id="btn-tour" class="ghost round" type="button" title="Toggle camera tour">🎥</button>
+    <button id="btn-mute" class="ghost round" type="button" title="Mute">🔊</button>
+  </nav>
+
+  <section id="build" class="glass" hidden>
+    <div class="build-head">
+      <div class="build-tabs"></div>
+      <div class="build-tools">
+        <button id="build-rotate" class="tool" type="button" title="Rotate (R)">⟳</button>
+        <button id="build-erase" class="tool" type="button" title="Eraser (X)">🧽</button>
+        <button id="build-close" class="tool" type="button" title="Done (Esc)">✕</button>
+      </div>
+    </div>
+    <div class="build-items"></div>
+  </section>
+
+  <div id="fade"></div>
+
+  <section id="drive-hud" hidden>
+    <div class="speedo glass"><b id="kmh">0</b><span>km/h</span></div>
+    <p class="drive-hint">W A S D / arrows to drive · Space brake · H horn · Esc to get out</p>
+    <button id="drive-exit" class="ghost glass" type="button">✕ Get out</button>
+    <div class="drive-pad">
+      <button type="button" data-k="arrowleft">◀</button>
+      <button type="button" data-k="arrowright">▶</button>
+      <button type="button" data-k="arrowdown">▼</button>
+      <button type="button" data-k="arrowup" class="gas">▲</button>
+    </div>
+  </section>
+
+  <section id="space-hud" hidden>
+    <div class="space-top glass">
+      <div>
+        <div class="space-title">Solar System</div>
+        <div id="space-date" class="space-date"></div>
+      </div>
+      <div class="space-speeds">
+        <button type="button" data-speed="0" class="spd">⏸</button>
+        <button type="button" data-speed="1" class="spd active">1 day/s</button>
+        <button type="button" data-speed="10" class="spd">10×</button>
+        <button type="button" data-speed="100" class="spd">100×</button>
+        <button type="button" id="space-today" class="spd">Today</button>
+      </div>
+      <button id="space-back" class="primary" type="button">⬇ Back to Zinda</button>
+    </div>
+    <div id="planet-card" class="glass" hidden>
+      <button id="planet-close" class="icon-btn" type="button" aria-label="Close">✕</button>
+      <h3 id="pc-name"></h3>
+      <dl>
+        <dt>Diameter</dt><dd id="pc-km"></dd>
+        <dt>Day</dt><dd id="pc-day"></dd>
+        <dt>Year</dt><dd id="pc-year"></dd>
+        <dt>Moons</dt><dd id="pc-moons"></dd>
+      </dl>
+      <p id="pc-fact"></p>
+    </div>
+    <p class="space-hint">Click a planet to fly to it · drag to orbit · scroll to zoom</p>
+    <p class="space-credit">Planet textures: Solar System Scope, CC BY 4.0</p>
+  </section>
+
+  <div id="pad" hidden>
+    <div class="pad-card glass">
+      <div class="pad-head">
+        <h2>Draw something alive</h2>
+        <button id="pad-close" class="icon-btn" type="button" aria-label="Close">✕</button>
+      </div>
+      <div class="pad-canvas-wrap">
+        <canvas id="pad-canvas"></canvas>
+        <div id="hand-cursor" hidden></div>
+        <p class="pad-hint">Try a fish, a bird, a tree, a cat, the sun…</p>
+      </div>
+      <div class="swatches"></div>
+      <div class="guess">
+        <span class="guess-label"><span class="ai-dot"></span>AI sees</span>
+        <span id="guess-text">draw something</span>
+      </div>
+      <div class="chips"></div>
+      <div class="pad-actions">
+        <button id="pad-undo" class="ghost" type="button">Undo</button>
+        <button id="pad-clear" class="ghost" type="button">Clear</button>
+        <button id="pad-go" class="primary" type="button" disabled>Bring to life ✨</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="cam" class="glass" hidden>
+    <canvas id="cam-canvas" width="200" height="150"></canvas>
+    <span id="cam-status">Starting…</span>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
